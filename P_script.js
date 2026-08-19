@@ -1,8 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    // ==========================================
-    // QUANTITY INCREMENT / DECREMENT
-    // ==========================================
+    
+    // quantity increase and decrease
+    
     document.querySelectorAll('.quantity-control').forEach(control => {
         const minusBtn = control.querySelector('.btn-minus');
         const plusBtn = control.querySelector('.btn-plus');
@@ -26,29 +26,28 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
 
-    // ==========================================
-    // ADD TO CART (DATABASE SYNC VIA AJAX)
-    // ==========================================
+
+    // add to cart
     document.querySelectorAll('.btn-add-cart').forEach(button => {
         button.addEventListener('click', (e) => {
             const card = e.target.closest('.product-card');
 
             if (!card) return;
 
-            // Extract data from card attributes & elements
+            // extract data from card
             const productId = card.getAttribute('data-id') || 0;
             const productName = card.querySelector('.product-name')?.textContent.trim() || '';
             const qtyElement = card.querySelector('.qty-val');
             const quantity = qtyElement ? (parseInt(qtyElement.textContent, 10) || 1) : 1;
 
-            // Fixed class selector (.price instead of .product-price)
+            // fixed class selector 
             const rawPrice = card.querySelector('.price')?.textContent || '0';
             const productPrice = parseFloat(rawPrice.replace(/[^0-9.]/g, '')) || 0;
 
             const imgElement = card.querySelector('.product-image');
             const productImage = imgElement ? imgElement.getAttribute('src') : '';
 
-            // Send payload to PHP handler
+            // send payload to php handler
             const formData = new URLSearchParams();
             formData.append('product_id', productId);
             formData.append('product_name', productName);
@@ -87,9 +86,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
 
-    // ==========================================
-    // SUCCESS MESSAGE POPUP FUNCTION
-    // ==========================================
+    // success message
+
     function showCartMessage(productName, quantity) {
         const oldMessage = document.querySelector('.cart-success-message');
         if (oldMessage) {
