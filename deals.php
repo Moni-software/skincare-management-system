@@ -49,7 +49,7 @@ if (isset($_POST['add_to_cart'])) {
 </head>
 <body>
 
-    <!-- මෙතැනින් Navigation bar එක ඇතුළත් වේ -->
+    
     <?php include("navbar.php"); ?>
     
     <?php if (isset($success_msg)): ?>
