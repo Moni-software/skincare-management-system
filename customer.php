@@ -17,9 +17,8 @@ if (isset($_GET['success'])) {
     if ($_GET['success'] == 'order_placed') $success_msg = "Your order has been placed successfully.";
 }
 
-/* =========================
-   UPDATE PROFILE
-========================= */
+/* UPDATE PROFILE*/
+
 if (isset($_POST['update_details'])) {
     $new_name = trim($_POST['name'] ?? '');
     $new_address = trim($_POST['address'] ?? '');
@@ -58,9 +57,8 @@ if (isset($_POST['update_details'])) {
     }
 }
 
-/* =========================
-   UPDATE CART QUANTITY (AJAX)
-========================= */
+/*UPDATE CART QUANTITY (AJAX)*/
+
 if (isset($_POST['update_cart_qty'])) {
     $cart_id = intval($_POST['cart_id']);
     $new_qty = intval($_POST['quantity']);
@@ -79,9 +77,8 @@ if (isset($_POST['update_cart_qty'])) {
     exit();
 }
 
-/* =========================
-   SUBMIT COMPLAINT
-========================= */
+/*SUBMIT COMPLAINT */
+
 $complaint_error = "";
 if (isset($_POST['submit_complaint'])) {
     $order_id = intval($_POST['order_id']);
@@ -106,9 +103,8 @@ if (isset($_POST['submit_complaint'])) {
     $chk_order->close();
 }
 
-/* =========================
-   CHECKOUT / PLACE ORDER
-========================= */
+/* CHECKOUT / PLACE ORDER*/
+
 if (isset($_POST['checkout_order'])) {
     $sum_stmt = $conn->prepare("SELECT SUM(product_price * quantity) AS total FROM cart WHERE customer_id = ?");
     $sum_stmt->bind_param("i", $customer_id);
@@ -149,9 +145,8 @@ if (isset($_POST['checkout_order'])) {
     }
 }
 
-/* =========================
-   FETCH CUSTOMER DATA SAFELY
-========================= */
+/* FETCH CUSTOMER DATA SAFELY*/
+
 $customer_query = $conn->prepare("SELECT * FROM customers WHERE id = ?");
 $customer_query->bind_param("i", $customer_id);
 $customer_query->execute();
@@ -168,9 +163,8 @@ $customer_profile_image = isset($customer['profile_image']) ? $customer['profile
 $default_avatar = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 24 24' fill='%2349362b'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z'/></svg>";
 $p_img = !empty($customer_profile_image) ? 'uploads/' . $customer_profile_image : $default_avatar;
 
-/* =========================
-   STATISTICS & FETCH LISTS
-========================= */
+/*STATISTICS & FETCH LISTS */
+
 $tot_ord_q = $conn->prepare("SELECT COUNT(*) AS total FROM orders WHERE customer_id = ?");
 $tot_ord_q->bind_param("i", $customer_id);
 $tot_ord_q->execute();
@@ -644,7 +638,7 @@ $complaints_stmt->close();
                                 $grand_total += $subtotal;
                                 
                                 $db_img = '';
-                                $is_deal = false; // හඳුනා ගැනීමට ඩීල් එකක්ද නිෂ්පාදනයක්ද කියා
+                                $is_deal = false;
 
                                 if (!empty($cart['product_image'])) {
                                     $db_img = trim($cart['product_image']);
@@ -654,7 +648,6 @@ $complaints_stmt->close();
                                     if(!empty($cart['product_id'])) {
                                         $p_id_chk = $cart['product_id'];
                                         
-                                        // Check product table
                                         $prod_img_q = $conn->prepare("SELECT image FROM product WHERE P_id = ? LIMIT 1");
                                         $prod_img_q->bind_param("i", $p_id_chk);
                                         $prod_img_q->execute();
@@ -664,7 +657,6 @@ $complaints_stmt->close();
                                         }
                                         $prod_img_q->close();
 
-                                        // Check deals table
                                         if(empty($db_img)) {
                                             $deal_img_q = $conn->prepare("SELECT image_url FROM deals WHERE id = ? LIMIT 1");
                                             $deal_img_q->bind_param("i", $p_id_chk);
@@ -673,7 +665,7 @@ $complaints_stmt->close();
                                             if($r_di = $res_di->fetch_assoc()) {
                                                 if(!empty($r_di['image_url'])) {
                                                     $db_img = $r_di['image_url'];
-                                                    $is_deal = true; // ඩීල් එකක් නම් ට್ರෲ වේ
+                                                    $is_deal = true;
                                                 }
                                             }
                                             $deal_img_q->close();
@@ -681,24 +673,20 @@ $complaints_stmt->close();
                                     }
                                 }
 
-                                // 🗂️ ෆෝල්ඩර් පාත් සැකසීම: 
-                                // නිෂ්පාදන සඳහා 'image' ෆෝල්ඩරය සහ ඩීල්ස් සඳහා 'images' ෆෝල්ඩරය භාවිත කරයි.
                                 $resolved_img = 'image/default.jpg';
                                 if (!empty($db_img) && $db_img !== 'N/A') {
                                     $clean_img = basename($db_img);
                                     
                                     if ($is_deal) {
-                                        // Deals සඳහා 'images' ෆෝල්ඩරය පරීක්ෂා කරයි
                                         if (file_exists('images/' . $clean_img)) {
                                             $resolved_img = 'images/' . $clean_img;
                                         } else {
                                             $resolved_img = 'images/' . $clean_img;
                                         }
                                     } else {
-                                        // Products සඳහා 'image' ෆෝල්ඩරය පරීක්ෂා කරයි
                                         if (file_exists('image/' . $clean_img)) {
                                             $resolved_img = 'image/' . $clean_img;
-                                        } elseif (file_exists('images/' . $clean_img)) { // fallback එකක් ලෙස 'images' ද බැලීමට
+                                        } elseif (file_exists('images/' . $clean_img)) {
                                             $resolved_img = 'images/' . $clean_img;
                                         } else {
                                             $resolved_img = 'image/' . $clean_img;
