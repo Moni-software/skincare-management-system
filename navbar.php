@@ -127,14 +127,6 @@ if (isset($_SESSION['customer_id']) && !empty($_SESSION['customer_id'])) {
             <?php endif; ?>
 
 
-            <!-- Cart -->
-            <a href="customer.php" class="cart-button">
-
-                🛒
-
-                <span class="cart-count">
-                    0
-                </span>
 
             </a>
 

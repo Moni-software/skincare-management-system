@@ -1,12 +1,11 @@
 <?php
 require_once 'connect.php';
 
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 if (isset($_POST['add_to_cart'])) {
-    if (!isset($_SESSION['user_id']) && !isset($_SESSION['email'])) {
-        header("Location: login.php");
-        exit();
-    }
-    
     $product_name = $_POST['product_name'];
     $product_price = $_POST['product_price'];
     $product_size = $_POST['product_size'];
@@ -49,7 +48,6 @@ if (isset($_POST['add_to_cart'])) {
 </head>
 <body>
 
-    
     <?php include("navbar.php"); ?>
     
     <?php if (isset($success_msg)): ?>
@@ -166,8 +164,9 @@ if (isset($_POST['add_to_cart'])) {
             const cartForms = document.querySelectorAll('.cart-form');
             cartForms.forEach(form => {
                 form.addEventListener('submit', function(e) {
-                    const isLoggedIn = localStorage.getItem("glowCareLoggedIn");
-                    if (isLoggedIn !== "true") {
+                    const isLoggedIn = <?php echo (isset($_SESSION['customer_id']) || isset($_SESSION['customer_name']) || isset($_SESSION['user_id']) || isset($_SESSION['email']) || isset($_SESSION['username'])) ? 'true' : 'false'; ?>;
+                    
+                    if (!isLoggedIn) {
                         e.preventDefault();
                         alert("You must login or register to add items to your cart!");
                         window.location.href = "login.php";

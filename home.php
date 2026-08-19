@@ -279,63 +279,57 @@ if (session_status() === PHP_SESSION_NONE) {
             transform: translateY(-2px);
         }
 
-        .beauty-banner {
+        /* Brand Intro Banner */
+        .brand-intro-banner {
             max-width: 1200px;
             margin: 0 auto 90px;
-            min-height: 350px;
-            padding: 60px;
+            min-height: 320px;
+            padding: 60px 40px;
             display: flex;
             align-items: center;
+            justify-content: center;
+            text-align: center;
             border-radius: 14px;
-            background:
+            background: 
                 linear-gradient(
-                    90deg,
-                    rgba(48,35,27,0.88),
-                    rgba(48,35,27,0.45)
+                    135deg,
+                    rgba(48,35,27,0.92),
+                    rgba(65,48,38,0.85)
                 ),
                 url("images/beauty-banner.jpg")
                 center/cover no-repeat;
             color: #ffffff;
+            box-shadow: 0 15px 35px rgba(48,35,27,0.15);
         }
 
-        .banner-content {
-            max-width: 550px;
+        .intro-banner-content {
+            max-width: 700px;
         }
 
-        .banner-content span {
+        .intro-banner-content span {
             color: #e2bb92;
             font-size: 12px;
             text-transform: uppercase;
             letter-spacing: 3px;
+            display: block;
+            margin-bottom: 12px;
+            font-weight: 600;
         }
 
-        .banner-content h2 {
+        .intro-banner-content h2 {
             font-family: Georgia, serif;
-            font-size: 42px;
+            font-size: 38px;
             font-weight: 400;
-            margin: 12px 0;
-        }
-
-        .banner-content p {
-            color: #f2eae3;
-            margin-bottom: 25px;
-        }
-
-        .banner-btn {
-            display: inline-block;
-            padding: 12px 25px;
-            border: 1px solid #ffffff;
-            color: #ffffff;
-            border-radius: 3px;
-            font-size: 12px;
-            text-transform: uppercase;
+            margin-bottom: 15px;
+            color: #fff;
             letter-spacing: 1px;
-            transition: 0.3s;
         }
 
-        .banner-btn:hover {
-            background: #ffffff;
-            color: #49362b;
+        .intro-banner-content p {
+            color: #f2eae3;
+            font-size: 16px;
+            line-height: 1.8;
+            margin: 0;
         }
 
         .why-section {
@@ -514,6 +508,19 @@ if (session_status() === PHP_SESSION_NONE) {
             color: #777;
         }
 
+        /* Scroll Reveal Animation Styles */
+        .reveal {
+            opacity: 0;
+            transform: translateY(40px);
+            transition: opacity 1s cubic-bezier(0.16, 1, 0.3, 1), transform 1s cubic-bezier(0.16, 1, 0.3, 1);
+            will-change: opacity, transform;
+        }
+
+        .reveal.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
         @media (max-width: 1100px) {
             .category-grid {
                 grid-template-columns: repeat(3, 1fr);
@@ -539,7 +546,7 @@ if (session_status() === PHP_SESSION_NONE) {
             .footer-grid {
                 grid-template-columns: 1fr 1fr;
             }
-            .beauty-banner {
+            .brand-intro-banner {
                 padding: 40px;
             }
         }
@@ -573,12 +580,12 @@ if (session_status() === PHP_SESSION_NONE) {
             .contact-strip {
                 gap: 30px;
             }
-            .beauty-banner {
-                min-height: 300px;
+            .brand-intro-banner {
+                min-height: 280px;
                 padding: 30px;
             }
-            .banner-content h2 {
-                font-size: 32px;
+            .intro-banner-content h2 {
+                font-size: 30px;
             }
             .section-heading h2 {
                 font-size: 30px;
@@ -758,23 +765,18 @@ if (session_status() === PHP_SESSION_NONE) {
     </div>
 </section>
 
-<section class="beauty-banner">
-    <div class="banner-content">
+<!-- Brand Intro Banner -->
+<section class="brand-intro-banner">
+    <div class="intro-banner-content">
         <span>
-            Glow With Confidence
+            Pure Care & Quality
         </span>
         <h2>
-            Your Beauty,
-            Your Way.
+            Pure Care for Flawless Skin
         </h2>
         <p>
-            From everyday essentials to special
-            occasion favourites, Glow Care brings
-            quality beauty products closer to you.
+            Elevate your daily routine with 100% authentic, skin-friendly products designed for your ultimate confidence, natural elegance, and everyday self-care.
         </p>
-        <a href="products.php" class="banner-btn">
-            Discover More
-        </a>
     </div>
 </section>
 
@@ -969,6 +971,30 @@ if (session_status() === PHP_SESSION_NONE) {
 </footer>
 
 <script src="auth.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const observerOptions = {
+            root: null,
+            rootMargin: '0px',
+            threshold: 0.15
+        };
+
+        const observer = new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('active');
+                }
+            });
+        }, observerOptions);
+
+        const targetElements = document.querySelectorAll('.section-heading, .category-card, .brand-intro-banner, .feature-card, .benefit-card, .stats-container');
+        
+        targetElements.forEach(el => {
+            el.classList.add('reveal');
+            observer.observe(el);
+        });
+    });
+</script>
 
 </body>
 </html>
