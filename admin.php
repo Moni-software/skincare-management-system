@@ -390,6 +390,8 @@ $supportPhone = htmlspecialchars($admin['contact_no'] ?? '+94 71 234 5678');
 
         /* ===== STAFF ACCESS ===== */
         .staff-access {
+            position: relative;
+            z-index: 5;
             max-width: 900px;
             margin: 0 auto 70px;
             padding: 25px 28px;
@@ -424,6 +426,12 @@ $supportPhone = htmlspecialchars($admin['contact_no'] ?? '+94 71 234 5678');
         .btn-outline:hover {
             background: #8c6239;
             color: #ffffff;
+        }
+
+        .admin-login-btn {
+            position: relative;
+            z-index: 10;
+            pointer-events: auto !important;
         }
 
         /* ===== CHAT ===== */
@@ -828,7 +836,12 @@ $supportPhone = htmlspecialchars($admin['contact_no'] ?? '+94 71 234 5678');
         <h3>Support Staff Access</h3>
         <p>Glow Care administrators can log in to review and manage submitted customer support requests.</p>
     </div>
-    <a href="admin_login.php" class="btn btn-outline">Admin Login</a>
+    <a href="admin_dashboard.php"
+       class="btn btn-outline admin-login-btn"
+       onclick="window.location.href='admin_dashboard.php'; return false;"
+       role="button">
+        Admin Login
+    </a>
 </div>
 
 <footer>
