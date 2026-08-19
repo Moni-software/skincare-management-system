@@ -6,11 +6,12 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 if (isset($_POST['add_to_cart'])) {
+    $product_id = $_POST['product_id'];
     $product_name = $_POST['product_name'];
     $product_price = $_POST['product_price'];
     $product_size = $_POST['product_size'];
-    $product_id = $_POST['product_id'];
 
+    // 1. Session 
     if (!isset($_SESSION['cart'])) {
         $_SESSION['cart'] = [];
     }
@@ -21,6 +22,20 @@ if (isset($_POST['add_to_cart'])) {
         'price' => $product_price,
         'size' => $product_size
     ];
+
+    // 2. Database 
+    $customer_id = isset($_SESSION['customer_id']) ? $_SESSION['customer_id'] : (isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 1);
+
+    // deals table 
+    $img_query = mysqli_query($conn, "SELECT image_url FROM deals WHERE id = '$product_id'");
+    $img_row = mysqli_fetch_assoc($img_query);
+    $product_image = $img_row ? $img_row['image_url'] : '';
+
+    $quantity = 1;
+
+    // insert Database cart table 
+    $insert_cart = "INSERT INTO cart (customer_id, product_name, product_price, quantity, product_image) VALUES ('$customer_id', '$product_name', '$product_price', '$quantity', '$product_image')";
+    mysqli_query($conn, $insert_cart);
 
     $success_msg = "Product successfully added to your cart!";
 }
@@ -52,7 +67,7 @@ if (isset($_POST['add_to_cart'])) {
     
     <?php if (isset($success_msg)): ?>
         <div style="background: #e6f4ea; color: #137333; padding: 12px; text-align: center; font-weight: 600; border-bottom: 1px solid #ceead6;">
-            <?php echo $success_msg; ?> <a href="dashboard.php" style="color: #137333; text-decoration: underline; margin-left: 5px;">View Cart</a>
+            <?php echo $success_msg; ?> <a href="customer.php" style="color: #137333; text-decoration: underline; margin-left: 5px;">View Cart</a>
         </div>
     <?php endif; ?>
 
