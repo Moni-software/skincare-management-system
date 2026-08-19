@@ -39,7 +39,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['login'])) {
                     session_regenerate_id(true);
                     $_SESSION['customer_id'] = $customer['id'];
                     $_SESSION['customer_name'] = $customer['name'];
-                    header("Location: deals.php");
+                    header("Location: customer.php");
                     exit();
                 } else {
                     $login_error = "Incorrect email or password.";
@@ -84,7 +84,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
                         $_SESSION['customer_id'] = $insert_stmt->insert_id;
                         $_SESSION['customer_name'] = $name;
                         $insert_stmt->close();
-                        header("Location: deals.php");
+                        header("Location: customer.php");
                         exit();
                     } else {
                         $register_error = "Registration failed. Please try again.";
@@ -328,11 +328,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
                 <form method="POST" action="login.php">
                     <div class="form-group">
                         <label>Email Address:</label>
-                        <input type="email" name="login_email" placeholder="Enter your email" required>
+                        <input type="email" name="login_email"  placeholder="Enter your email" autocomplete= "off"  required>
                     </div>
                     <div class="form-group" style="margin-bottom: 22px;">
                         <label>Password:</label>
-                        <input type="password" name="login_password" placeholder="Enter your password" required>
+                        <input type="password" name="login_password" placeholder="Enter your password" autocomplete= "new-password"required>
                     </div>
                     <button type="submit" name="login" class="btn">Login</button>
                 </form>
