@@ -52,9 +52,9 @@ if (isset($_SESSION['customer_id']) && !empty($_SESSION['customer_id'])) {
             <!-- Products Dropdown -->
             <div class="nav-dropdown">
 
-                <a href="products.php" class="nav-link">
-                    Products <span class="arrow">▾</span>
-                </a>
+                <span class="products">Products <span class="arrow">▾</span></span>
+            
+            
 
                 <div class="dropdown-menu">
 
@@ -128,7 +128,7 @@ if (isset($_SESSION['customer_id']) && !empty($_SESSION['customer_id'])) {
 
 
             <!-- Cart -->
-            <a href="cart.php" class="cart-button">
+            <a href="customer.php" class="cart-button">
 
                 🛒
 
@@ -274,6 +274,8 @@ if (isset($_SESSION['customer_id']) && !empty($_SESSION['customer_id'])) {
 
 .nav-dropdown {
     position: relative;
+    display: flex;
+    align-items: center;
 }
 
 
@@ -527,6 +529,15 @@ if (isset($_SESSION['customer_id']) && !empty($_SESSION['customer_id'])) {
     padding: 2px;
 }
 
+.products{
+color: #ffffff;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: 0.3s;}
+
 
 /* ================================
    MOBILE
@@ -588,5 +599,6 @@ if (isset($_SESSION['customer_id']) && !empty($_SESSION['customer_id'])) {
     }
 
 }
+
 
 </style>
