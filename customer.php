@@ -8,270 +8,135 @@ if (!isset($_SESSION['customer_id'])) {
 }
 
 $customer_id = $_SESSION['customer_id'];
+$success_msg = "";
+$error_msg = "";
 
-/* =========================
-   UPDATE PROFILE
-========================= */
+if (isset($_GET['success'])) {
+    if ($_GET['success'] == 'details_updated') $success_msg = "Your profile details were updated successfully.";
+    if ($_GET['success'] == 'complaint_added') $success_msg = "Your complaint has been submitted successfully to administration.";
+    if ($_GET['success'] == 'order_placed') $success_msg = "Your order has been placed successfully.";
+}
+
+/* UPDATE PROFILE*/
+
 if (isset($_POST['update_details'])) {
-
-    $new_name = trim($_POST['name']);
-    $new_address = trim($_POST['address']);
-    $new_phone = trim($_POST['phone']);
+    $new_name = trim($_POST['name'] ?? '');
+    $new_address = trim($_POST['address'] ?? '');
+    $new_phone = trim($_POST['phone'] ?? '');
 
     if (isset($_FILES['profile_image']) && $_FILES['profile_image']['error'] === 0) {
-
         $target_dir = "uploads/";
-
         if (!file_exists($target_dir)) {
             mkdir($target_dir, 0777, true);
         }
-
-        $file_extension = strtolower(
-            pathinfo($_FILES['profile_image']['name'], PATHINFO_EXTENSION)
-        );
-
+        $file_extension = strtolower(pathinfo($_FILES['profile_image']['name'], PATHINFO_EXTENSION));
         $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
 
         if (in_array($file_extension, $allowed_extensions, true)) {
-
-            $new_filename =
-                "profile_" . $customer_id . "_" . time() . "." . $file_extension;
-
+            $new_filename = "profile_" . $customer_id . "_" . time() . "." . $file_extension;
             $target_file = $target_dir . $new_filename;
 
-            if (move_uploaded_file(
-                $_FILES['profile_image']['tmp_name'],
-                $target_file
-            )) {
-
-                $img_stmt = $conn->prepare(
-                    "UPDATE customers SET profile_image = ? WHERE id = ?"
-                );
-
-                $img_stmt->bind_param(
-                    "si",
-                    $new_filename,
-                    $customer_id
-                );
-
+            if (move_uploaded_file($_FILES['profile_image']['tmp_name'], $target_file)) {
+                $img_stmt = $conn->prepare("UPDATE customers SET profile_image = ? WHERE id = ?");
+                $img_stmt->bind_param("si", $new_filename, $customer_id);
                 $img_stmt->execute();
                 $img_stmt->close();
             }
         }
     }
 
-    $up_stmt = $conn->prepare(
-        "UPDATE customers
-         SET name = ?, address = ?, phone = ?
-         WHERE id = ?"
-    );
-
-    $up_stmt->bind_param(
-        "sssi",
-        $new_name,
-        $new_address,
-        $new_phone,
-        $customer_id
-    );
-
-    $up_stmt->execute();
-    $up_stmt->close();
-
-    header("Location: customer.php?success=details_updated");
-    exit();
+    $up_stmt = $conn->prepare("UPDATE customers SET name = ?, address = ?, phone = ? WHERE id = ?");
+    $up_stmt->bind_param("sssi", $new_name, $new_address, $new_phone, $customer_id);
+    if ($up_stmt->execute()) {
+        $up_stmt->close();
+        header("Location: customer.php?success=details_updated");
+        exit();
+    } else {
+        $error_msg = "Failed to update profile details.";
+        $up_stmt->close();
+    }
 }
 
+/*UPDATE CART QUANTITY (AJAX)*/
 
-/* =========================
-   UPDATE CART QUANTITY
-========================= */
 if (isset($_POST['update_cart_qty'])) {
-
     $cart_id = intval($_POST['cart_id']);
     $new_qty = intval($_POST['quantity']);
 
     if ($new_qty > 0) {
-
-        $up_cart = $conn->prepare(
-            "UPDATE cart
-             SET quantity = ?
-             WHERE cart_id = ?
-             AND customer_id = ?"
-        );
-
-        $up_cart->bind_param(
-            "iii",
-            $new_qty,
-            $cart_id,
-            $customer_id
-        );
-
+        $up_cart = $conn->prepare("UPDATE cart SET quantity = ? WHERE cart_id = ? AND customer_id = ?");
+        $up_cart->bind_param("iii", $new_qty, $cart_id, $customer_id);
         $up_cart->execute();
         $up_cart->close();
-
     } else {
-
-        $del_cart = $conn->prepare(
-            "DELETE FROM cart
-             WHERE cart_id = ?
-             AND customer_id = ?"
-        );
-
-        $del_cart->bind_param(
-            "ii",
-            $cart_id,
-            $customer_id
-        );
-
+        $del_cart = $conn->prepare("DELETE FROM cart WHERE cart_id = ? AND customer_id = ?");
+        $del_cart->bind_param("ii", $cart_id, $customer_id);
         $del_cart->execute();
         $del_cart->close();
     }
-
     exit();
 }
 
+/*SUBMIT COMPLAINT */
 
-/* =========================
-   SUBMIT COMPLAINT
-========================= */
 $complaint_error = "";
-
 if (isset($_POST['submit_complaint'])) {
-
     $order_id = intval($_POST['order_id']);
     $message = trim($_POST['message']);
 
-    $chk_order = $conn->prepare(
-        "SELECT order_id
-         FROM orders
-         WHERE order_id = ?
-         AND customer_id = ?"
-    );
-
-    $chk_order->bind_param(
-        "ii",
-        $order_id,
-        $customer_id
-    );
-
+    $chk_order = $conn->prepare("SELECT order_id FROM orders WHERE order_id = ? AND customer_id = ?");
+    $chk_order->bind_param("ii", $order_id, $customer_id);
     $chk_order->execute();
-
     $chk_res = $chk_order->get_result();
 
     if ($chk_res->num_rows > 0) {
-
-        $ins_comp = $conn->prepare(
-            "INSERT INTO complaints
-             (customer_id, order_id, message)
-             VALUES (?, ?, ?)"
-        );
-
-        $ins_comp->bind_param(
-            "iis",
-            $customer_id,
-            $order_id,
-            $message
-        );
-
+        $ins_comp = $conn->prepare("INSERT INTO complaints (customer_id, order_id, message, status) VALUES (?, ?, ?, 'Pending')");
+        $ins_comp->bind_param("iis", $customer_id, $order_id, $message);
         $ins_comp->execute();
         $ins_comp->close();
-
         $chk_order->close();
-
         header("Location: customer.php?success=complaint_added");
         exit();
-
     } else {
-
-        $complaint_error =
-            "⚠️ This Order ID does not belong to your account or does not exist!";
+        $complaint_error = "Please enter a correct order ID that belongs to your account.";
     }
-
     $chk_order->close();
 }
 
+/* CHECKOUT / PLACE ORDER*/
 
-/* =========================
-   CHECKOUT / PLACE ORDER
-========================= */
 if (isset($_POST['checkout_order'])) {
-
-    $sum_stmt = $conn->prepare(
-        "SELECT SUM(product_price * quantity) AS total
-         FROM cart
-         WHERE customer_id = ?"
-    );
-
+    $sum_stmt = $conn->prepare("SELECT SUM(product_price * quantity) AS total FROM cart WHERE customer_id = ?");
     $sum_stmt->bind_param("i", $customer_id);
     $sum_stmt->execute();
-
     $sum_res = $sum_stmt->get_result()->fetch_assoc();
-
     $total_amount = $sum_res['total'] ?? 0;
-
     $sum_stmt->close();
 
     if ($total_amount > 0) {
+        $payment_method = $_POST['payment_method'] ?? 'Cash on Delivery';
 
-        $payment_method =
-            $_POST['payment_method'] ?? 'Cash on Delivery';
-
-        $prod_stmt = $conn->prepare(
-            "SELECT product_name, quantity
-             FROM cart
-             WHERE customer_id = ?"
-        );
-
+        $prod_stmt = $conn->prepare("SELECT product_name, quantity FROM cart WHERE customer_id = ?");
         $prod_stmt->bind_param("i", $customer_id);
         $prod_stmt->execute();
-
-        $cart_products = $prod_stmt
-            ->get_result()
-            ->fetch_all(MYSQLI_ASSOC);
-
+        $cart_products = $prod_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $prod_stmt->close();
 
         $product_list = [];
-
         foreach ($cart_products as $product) {
-
-            $product_list[] =
-                $product['product_name'] .
-                " x" .
-                $product['quantity'];
+            $product_list[] = $product['product_name'] . " x" . $product['quantity'];
         }
-
         $products_text = implode(", ", $product_list);
 
-        $payment_status = "Pending";
+        $payment_status = ($payment_method === "Credit/Debit Card") ? "Paid" : "Pending";
 
-        if ($payment_method === "Credit/Debit Card") {
-            $payment_status = "Paid";
-        }
-
-        $order_stmt = $conn->prepare(
-            "INSERT INTO orders
-             (customer_id, products, total_amount, status, payment_status)
-             VALUES (?, ?, ?, 'Pending Delivery', ?)"
-        );
-
-        $order_stmt->bind_param(
-            "isds",
-            $customer_id,
-            $products_text,
-            $total_amount,
-            $payment_status
-        );
-
+        $order_stmt = $conn->prepare("INSERT INTO orders (customer_id, products, total_amount, status, payment_status) VALUES (?, ?, ?, 'Pending Delivery', ?)");
+        $order_stmt->bind_param("isds", $customer_id, $products_text, $total_amount, $payment_status);
         $order_stmt->execute();
         $order_stmt->close();
 
-        $del_cart_all = $conn->prepare(
-            "DELETE FROM cart WHERE customer_id = ?"
-        );
-
+        $del_cart_all = $conn->prepare("DELETE FROM cart WHERE customer_id = ?");
         $del_cart_all->bind_param("i", $customer_id);
-
         $del_cart_all->execute();
         $del_cart_all->close();
 
@@ -280,1412 +145,753 @@ if (isset($_POST['checkout_order'])) {
     }
 }
 
+/* FETCH CUSTOMER DATA SAFELY*/
 
-/* =========================
-   FETCH CUSTOMER
-========================= */
-$customer_query = $conn->prepare(
-    "SELECT * FROM customers WHERE id = ?"
-);
-
-$customer_query->bind_param(
-    "i",
-    $customer_id
-);
-
+$customer_query = $conn->prepare("SELECT * FROM customers WHERE id = ?");
+$customer_query->bind_param("i", $customer_id);
 $customer_query->execute();
-
-$customer_res = $customer_query->get_result();
-
-$customer = $customer_res->fetch_assoc() ?: [
-    'name' => 'Valued Customer',
-    'email' => '',
-    'address' => '',
-    'phone' => '',
-    'profile_image' => ''
-];
-
+$customer_result = $customer_query->get_result();
+$customer = $customer_result->fetch_assoc() ?: [];
 $customer_query->close();
 
+$customer_name = isset($customer['name']) ? $customer['name'] : 'Valued Customer';
+$customer_email = isset($customer['email']) ? $customer['email'] : '';
+$customer_address = isset($customer['address']) ? $customer['address'] : '';
+$customer_phone = isset($customer['phone']) ? $customer['phone'] : '';
+$customer_profile_image = isset($customer['profile_image']) ? $customer['profile_image'] : '';
 
-$default_avatar =
-    "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
+$default_avatar = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 24 24' fill='%2349362b'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z'/></svg>";
+$p_img = !empty($customer_profile_image) ? 'uploads/' . $customer_profile_image : $default_avatar;
 
-$p_img = !empty($customer['profile_image'])
-    ? 'uploads/' . $customer['profile_image']
-    : $default_avatar;
+/*STATISTICS & FETCH LISTS */
 
-
-/* =========================
-   TOTAL ORDERS
-========================= */
-$tot_ord_q = $conn->prepare(
-    "SELECT COUNT(*) AS total
-     FROM orders
-     WHERE customer_id = ?"
-);
-
-$tot_ord_q->bind_param(
-    "i",
-    $customer_id
-);
-
+$tot_ord_q = $conn->prepare("SELECT COUNT(*) AS total FROM orders WHERE customer_id = ?");
+$tot_ord_q->bind_param("i", $customer_id);
 $tot_ord_q->execute();
-
-$tot_ord_res =
-    $tot_ord_q->get_result()->fetch_assoc();
-
-$total_orders =
-    $tot_ord_res['total'] ?? 0;
-
+$total_orders = $tot_ord_q->get_result()->fetch_assoc()['total'] ?? 0;
 $tot_ord_q->close();
 
-
-/* =========================
-   PENDING ORDERS
-========================= */
-$pen_ord_q = $conn->prepare(
-    "SELECT COUNT(*) AS pending
-     FROM orders
-     WHERE customer_id = ?
-     AND status = 'Pending Delivery'"
-);
-
-$pen_ord_q->bind_param(
-    "i",
-    $customer_id
-);
-
+$pen_ord_q = $conn->prepare("SELECT COUNT(*) AS pending FROM orders WHERE customer_id = ? AND status = 'Pending Delivery'");
+$pen_ord_q->bind_param("i", $customer_id);
 $pen_ord_q->execute();
-
-$pen_ord_res =
-    $pen_ord_q->get_result()->fetch_assoc();
-
-$pending_orders =
-    $pen_ord_res['pending'] ?? 0;
-
+$pending_orders = $pen_ord_q->get_result()->fetch_assoc()['pending'] ?? 0;
 $pen_ord_q->close();
 
-
-/* =========================
-   FETCH ORDERS
-========================= */
-$orders_stmt = $conn->prepare(
-    "SELECT *
-     FROM orders
-     WHERE customer_id = ?
-     ORDER BY order_date DESC"
-);
-
-$orders_stmt->bind_param(
-    "i",
-    $customer_id
-);
-
+$orders_stmt = $conn->prepare("SELECT * FROM orders WHERE customer_id = ? ORDER BY order_date DESC");
+$orders_stmt->bind_param("i", $customer_id);
 $orders_stmt->execute();
-
-$orders_items =
-    $orders_stmt
-        ->get_result()
-        ->fetch_all(MYSQLI_ASSOC);
-
+$orders_items = $orders_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $orders_stmt->close();
 
-
-/* =========================
-   FETCH CART
-========================= */
-$cart_stmt = $conn->prepare(
-    "SELECT *
-     FROM cart
-     WHERE customer_id = ?"
-);
-
-$cart_stmt->bind_param(
-    "i",
-    $customer_id
-);
-
+$cart_stmt = $conn->prepare("SELECT * FROM cart WHERE customer_id = ?");
+$cart_stmt->bind_param("i", $customer_id);
 $cart_stmt->execute();
-
-$cart_items =
-    $cart_stmt
-        ->get_result()
-        ->fetch_all(MYSQLI_ASSOC);
-
+$cart_items = $cart_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $cart_stmt->close();
 
+$cart_unique_count = count($cart_items);
 
-/* =========================
-   FETCH COMPLAINTS
-========================= */
-$complaints_stmt = $conn->prepare(
-    "SELECT *
-     FROM complaints
-     WHERE customer_id = ?
-     ORDER BY created_at DESC"
-);
-
-$complaints_stmt->bind_param(
-    "i",
-    $customer_id
-);
-
+$complaints_stmt = $conn->prepare("SELECT * FROM complaints WHERE customer_id = ? ORDER BY created_at DESC");
+$complaints_stmt->bind_param("i", $customer_id);
 $complaints_stmt->execute();
-
-$complaints_items =
-    $complaints_stmt
-        ->get_result()
-        ->fetch_all(MYSQLI_ASSOC);
-
+$complaints_items = $complaints_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $complaints_stmt->close();
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
 <meta charset="UTF-8">
-
-<meta name="viewport"
-content="width=device-width, initial-scale=1.0">
-
-<title>Glow Care - Customer Dashboard</title>
-<link rel="stylesheet" href="style.css">
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Glow Care - Luxury Customer Dashboard</title>
 <style>
-
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-}
-
-body {
-    background: #fff8f4;
-    color: #333;
-}
-
-.sub-navbar-wrap {
-    background: #fff8f4;
-    padding: 28px 20px 0;
-}
-
-.sub-navbar {
-    max-width: 880px;
-    min-height: 62px;
-    margin: 0 auto;
-    padding: 8px 12px;
-    background: rgba(255,255,255,.92);
-    border: 1px solid #e6dfe2;
-    border-radius: 12px;
-    box-shadow: 0 3px 14px rgba(0,0,0,.08);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-}
-
-.sub-navbar nav {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    flex-wrap: wrap;
-}
-
-.sub-navbar nav a {
-    color: #222;
-    text-decoration: none;
-    font-size: 13px;
-    font-weight: 600;
-    padding: 10px 14px;
-    border-radius: 7px;
-    cursor: pointer;
-    transition: .2s;
-}
-
-.sub-navbar nav a:hover,
-.sub-navbar nav a.active {
-    background: #f04b43;
-    color: #fff;
-}
-
-.user-pill {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    white-space: nowrap;
-    color: #444;
-    font-size: 13px;
-    padding-right: 8px;
-}
-
-.user-pill img {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    object-fit: cover;
-}
-
-.container {
-    max-width: 880px;
-    margin: 20px auto 50px;
-    padding: 0 20px;
-}
-
-.section-tab {
-    display: none;
-}
-
-.section-tab.active-tab {
-    display: block;
-    animation: fadeIn .25s ease;
-}
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(7px);
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
     }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
+    html {
+        scroll-behavior: smooth;
     }
-}
-
-.welcome-card {
-    background: linear-gradient(110deg, #27212c, #3e2939);
-    color: #fff;
-    border-radius: 14px;
-    padding: 27px 30px;
-    margin-bottom: 22px;
-}
-
-.welcome-card h2 {
-    color: #fff;
-    border: 0;
-    padding: 0;
-    margin: 0 0 16px;
-}
-
-.stats-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-    margin-bottom: 22px;
-}
-
-.stat-card {
-    background: #fff;
-    border-left: 4px solid #ed514c;
-    border-radius: 12px;
-    padding: 22px;
-    text-align: center;
-}
-
-.stat-card h3 {
-    color: #666;
-    font-size: 13px;
-    margin-bottom: 7px;
-}
-
-.stat-card p {
-    font-size: 24px;
-    font-weight: bold;
-}
-
-.card-box {
-    background: #fff;
-    border: 1px solid #e9e1e3;
-    border-radius: 14px;
-    padding: 22px;
-    margin-bottom: 24px;
-}
-
-h2 {
-    color: #4b263a;
-    font-size: 18px;
-    padding-bottom: 12px;
-    margin-bottom: 16px;
-    border-bottom: 1px solid #eee3e6;
-}
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: #fff;
-}
-
-th {
-    background: #682153;
-    color: white;
-    padding: 12px;
-    text-align: left;
-}
-
-td {
-    padding: 13px;
-    border-bottom: 1px solid #f0e6e9;
-    font-size: 12px;
-}
-
-.cart-img {
-    width: 45px;
-    height: 45px;
-    object-fit: cover;
-    border-radius: 50%;
-}
-
-.qty-input {
-    width: 60px;
-    padding: 6px;
-    text-align: center;
-}
-
-.form-group {
-    margin-bottom: 18px;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 7px;
-    color: #4b263a;
-    font-weight: 600;
-}
-
-.form-group input,
-.form-group textarea,
-.form-group select {
-    width: 100%;
-    padding: 11px 12px;
-    border: 1px solid #e0d6da;
-    border-radius: 7px;
-}
-
-.btn {
-    background: #f04b43;
-    color: #fff;
-    border: 0;
-    padding: 10px 18px;
-    border-radius: 7px;
-    cursor: pointer;
-    font-weight: bold;
-}
-
-.logout-btn-profile {
-    background: #5a3149;
-    color: #fff;
-    border: 0;
-    padding: 11px 20px;
-    border-radius: 7px;
-    cursor: pointer;
-    font-weight: bold;
-}
-
-.error-msg {
-    color: #c62828;
-    font-size: 12px;
-    margin-top: 5px;
-}
-
-.success-msg {
-    background: #e9f7ed;
-    color: #28733c;
-    padding: 11px 14px;
-    border-radius: 8px;
-    margin-bottom: 18px;
-    text-align: center;
-}
-
-.payment-box-toggle {
-    border: 1px solid #e6dce0;
-    padding: 13px;
-    border-radius: 8px;
-    margin-bottom: 10px;
-}
-
-.profile-container {
-    display: flex;
-    align-items: center;
-    gap: 25px;
-    margin-bottom: 22px;
-}
-
-.profile-pic-wrapper {
-    position: relative;
-    width: 90px;
-    height: 90px;
-}
-
-.profile-pic {
-    width: 90px;
-    height: 90px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 3px solid #f04b43;
-}
-
-.edit-icon-btn {
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    width: 30px;
-    height: 30px;
-    border: 0;
-    border-radius: 50%;
-    background: #5a3149;
-    color: #fff;
-    cursor: pointer;
-}
-
-@media (max-width: 700px) {
-
-    .sub-navbar {
+    body {
+        font-family: "Segoe UI", Arial, sans-serif;
+        background: #f7f2ec;
+        color: #3b2c25;
+        line-height: 1.6;
+    }
+    a {
+        text-decoration: none;
+    }
+    
+    .dashboard-wrapper {
+        max-width: 1350px;
+        margin: 40px auto;
+        padding: 0 20px;
+        display: flex;
+        gap: 35px;
+    }
+    
+    .sidebar {
+        width: 290px;
+        background: #ffffff;
+        border: 1px solid #e8ddd2;
+        border-radius: 14px;
+        padding: 35px 22px;
+        height: fit-content;
+        box-shadow: 0 15px 40px rgba(67,48,35,0.06);
+    }
+    
+    .sidebar-profile {
+        text-align: center;
+        padding-bottom: 25px;
+        border-bottom: 1px solid #eee4da;
+        margin-bottom: 22px;
+    }
+    
+    .sidebar-profile img {
+        width: 85px;
+        height: 85px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid #b88656;
+        background: #fcfaf8;
+        margin-bottom: 12px;
+    }
+    
+    .sidebar-profile h3 {
+        font-family: Georgia, serif;
+        font-size: 19px;
+        color: #3c2d25;
+        font-weight: 400;
+    }
+    
+    .sidebar-nav {
+        display: flex;
         flex-direction: column;
+        gap: 10px;
+    }
+    
+    .sidebar-nav a {
+        color: #5b4232;
+        font-size: 13px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        padding: 13px 18px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: 0.3s;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
+    .sidebar-nav a:hover,
+    .sidebar-nav a.active {
+        background: #b88656;
+        color: #ffffff;
     }
 
-    .stats-grid {
-        grid-template-columns: 1fr;
+    .cart-badge-count {
+        background: #3c2d25;
+        color: #fff;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 11px;
     }
-
-    table {
+    .sidebar-nav a.active .cart-badge-count {
+        background: #fff;
+        color: #b88656;
+    }
+    
+    .main-content {
+        flex: 1;
+    }
+    
+    .section-tab {
+        display: none;
+    }
+    
+    .section-tab.active-tab {
         display: block;
-        overflow-x: auto;
+        animation: fadeIn 0.4s ease forwards;
     }
-}
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .welcome-card {
+        background: linear-gradient(rgba(45, 32, 25, 0.88), rgba(45, 32, 25, 0.88)), url("images/hero-model.jpg") center/cover no-repeat;
+        color: #ffffff;
+        border-radius: 14px;
+        padding: 40px;
+        margin-bottom: 30px;
+        box-shadow: 0 15px 40px rgba(67,48,35,0.08);
+    }
+    
+    .welcome-card h2 {
+        font-family: Georgia, serif;
+        font-size: 30px;
+        font-weight: 400;
+        margin-bottom: 12px;
+        border: none;
+        padding: 0;
+        color: #fff;
+    }
+    
+    .welcome-card p {
+        color: #f8f4ef;
+        font-size: 15px;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 22px;
+        margin-bottom: 30px;
+    }
+    
+    .stat-card {
+        background: #ffffff;
+        border: 1px solid #e8ddd2;
+        border-left: 4px solid #b88656;
+        border-radius: 14px;
+        padding: 28px;
+        text-align: center;
+        box-shadow: 0 10px 30px rgba(67,48,35,0.04);
+    }
+    
+    .stat-card h3 {
+        color: #77675c;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 8px;
+    }
+    
+    .stat-card p {
+        font-size: 28px;
+        font-weight: 700;
+        color: #8c6239;
+    }
+    
+    .card-box {
+        background: #ffffff;
+        border: 1px solid #e8ddd2;
+        border-radius: 14px;
+        padding: 38px;
+        margin-bottom: 30px;
+        box-shadow: 0 15px 40px rgba(67,48,35,0.06);
+    }
+    
+    .card-box h2 {
+        font-family: Georgia, serif;
+        font-size: 25px;
+        font-weight: 400;
+        color: #3c2d25;
+        padding-bottom: 14px;
+        margin-bottom: 22px;
+        border-bottom: 1px solid #eee4da;
+    }
+    
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #ffffff;
+    }
+    
+    th {
+        background: #49362b;
+        color: #ffffff;
+        padding: 15px;
+        text-align: left;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 600;
+    }
+    
+    td {
+        padding: 16px;
+        border-bottom: 1px solid #eee4da;
+        font-size: 14px;
+        color: #5b4232;
+        vertical-align: middle;
+    }
+    
+    .cart-img {
+        width: 65px;
+        height: 65px;
+        object-fit: cover;
+        border-radius: 8px;
+        border: 1px solid #e8ddd2;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        background: #fcfaf8;
+    }
+    
+    .qty-input {
+        width: 70px;
+        padding: 9px;
+        text-align: center;
+        border: 1px solid #e8ddd2;
+        border-radius: 6px;
+        font-size: 14px;
+    }
+    
+    .form-group {
+        margin-bottom: 22px;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        color: #49362b;
+        font-weight: 600;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+        width: 100%;
+        padding: 13px 16px;
+        border: 1px solid #e8ddd2;
+        border-radius: 6px;
+        font-size: 14px;
+        color: #3b2c25;
+        background: #fcfaf8;
+    }
+    
+    .form-group input:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: #b88656;
+        background: #ffffff;
+    }
+    
+    .btn {
+        display: inline-block;
+        background: #b88656;
+        color: #ffffff;
+        border: 0;
+        padding: 13px 30px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        font-size: 12px;
+        transition: 0.3s;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    }
+    
+    .btn:hover {
+        background: #3c2d25;
+        transform: translateY(-2px);
+    }
+    
+    .error-msg {
+        color: #b33939;
+        font-size: 13px;
+        margin-top: 5px;
+        font-weight: 600;
+    }
+    
+    .success-msg {
+        background: #f0f7f4;
+        color: #2d6a4f;
+        padding: 16px;
+        border: 1px solid #b7e4c7;
+        border-radius: 8px;
+        margin-bottom: 25px;
+        text-align: center;
+        font-weight: 600;
+    }
 
+    .payment-box-toggle {
+        border: 1px solid #e8ddd2;
+        padding: 16px;
+        border-radius: 8px;
+        margin-bottom: 12px;
+        background: #fcfaf8;
+    }
+
+    @media (max-width: 900px) {
+        .dashboard-wrapper {
+            flex-direction: column;
+        }
+        .sidebar {
+            width: 100%;
+        }
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
+        table {
+            display: block;
+            overflow-x: auto;
+        }
+    }
 </style>
-
 </head>
-
 <body>
 
 <?php include 'navbar.php'; ?>
 
-<div class="sub-navbar-wrap">
+<div class="dashboard-wrapper">
+    <!-- Sidebar Navigation -->
+    <div class="sidebar">
+        <div class="sidebar-profile">
+            <img src="<?php echo htmlspecialchars($p_img); ?>" alt="Customer Profile">
+            <h3><?php echo htmlspecialchars($customer_name); ?></h3>
+        </div>
+        <div class="sidebar-nav">
+            <a onclick="switchTab('dashboard-tab')" id="nav-dashboard" class="active">Dashboard</a>
+            <a onclick="switchTab('cart-tab')" id="nav-cart">
+                <span>My Cart</span>
+                <span class="cart-badge-count" id="sidebarCartBadge"><?php echo $cart_unique_count; ?></span>
+            </a>
+            <a onclick="switchTab('orders-tab')" id="nav-orders">My Orders</a>
+            <a onclick="switchTab('complaints-tab')" id="nav-complaints">Support & Complaints</a>
+            <a onclick="switchTab('profile-tab')" id="nav-profile">My Profile</a>
+            <a href="deals.php">Deals & Products</a>
+            <a href="customer_logout.php" style="color: #b33939;">Logout</a>
+        </div>
+    </div>
 
-<div class="sub-navbar">
+    <!-- Main Content Area -->
+    <div class="main-content">
+        <?php if (!empty($success_msg)): ?>
+            <div class="success-msg"><?php echo htmlspecialchars($success_msg); ?></div>
+        <?php endif; ?>
 
-<nav>
+        <!-- DASHBOARD TAB -->
+        <div id="dashboard-tab" class="section-tab active-tab">
+            <div class="welcome-card">
+                <h2>Welcome Back, <?php echo htmlspecialchars($customer_name); ?>!</h2>
+                <p>Manage your luxury beauty care routine, track your orders, and experience elegance at your fingertips.</p>
+            </div>
 
-<a onclick="switchTab('dashboard-tab')"
-id="nav-dashboard"
-class="active">
-🏠 Dashboard
-</a>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Total Orders Placed</h3>
+                    <p><?php echo $total_orders; ?></p>
+                </div>
+                <div class="stat-card">
+                    <h3>Pending Deliveries</h3>
+                    <p><?php echo $pending_orders; ?></p>
+                </div>
+            </div>
 
-<a onclick="switchTab('cart-tab')"
-id="nav-cart">
-🛍️ My Cart
-</a>
+            <div class="card-box">
+                <h2>Recent Orders & Status</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Products</th>
+                            <th>Total Amount</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (count($orders_items) > 0): ?>
+                            <?php $count = 0; foreach ($orders_items as $ord): if ($count >= 3) break; $count++; ?>
+                                <tr>
+                                    <td><strong>#GLW-<?php echo $ord['order_id']; ?></strong></td>
+                                    <td><?php echo htmlspecialchars($ord['products']); ?></td>
+                                    <td>Rs. <?php echo number_format($ord['total_amount'], 2); ?></td>
+                                    <td><strong style="color:#b88656;"><?php echo htmlspecialchars($ord['status']); ?></strong></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr><td colspan="4" style="text-align:center;color:#77675c;padding:25px;">No recent orders found.</td></tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
-<a onclick="switchTab('orders-tab')"
-id="nav-orders">
-📦 My Orders
-</a>
+        <!-- CART TAB -->
+        <div id="cart-tab" class="section-tab">
+            <div class="card-box">
+                <h2>My Cart & Secure Checkout</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Image</th>
+                            <th>Product Name</th>
+                            <th>Price</th>
+                            <th>Quantity</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php 
+                        $grand_total = 0; 
+                        if (count($cart_items) > 0): 
+                            foreach ($cart_items as $cart): 
+                                $subtotal = $cart['product_price'] * $cart['quantity'];
+                                $grand_total += $subtotal;
+                                
+                                $db_img = '';
+                                $is_deal = false;
 
-<a onclick="switchTab('complaints-tab')"
-id="nav-complaints">
-💬 Support & Complaints
-</a>
+                                if (!empty($cart['product_image'])) {
+                                    $db_img = trim($cart['product_image']);
+                                } elseif (!empty($cart['image'])) {
+                                    $db_img = trim($cart['image']);
+                                } else {
+                                    if(!empty($cart['product_id'])) {
+                                        $p_id_chk = $cart['product_id'];
+                                        
+                                        $prod_img_q = $conn->prepare("SELECT image FROM product WHERE P_id = ? LIMIT 1");
+                                        $prod_img_q->bind_param("i", $p_id_chk);
+                                        $prod_img_q->execute();
+                                        $res_pi = $prod_img_q->get_result();
+                                        if($r_pi = $res_pi->fetch_assoc()) {
+                                            if(!empty($r_pi['image'])) $db_img = $r_pi['image'];
+                                        }
+                                        $prod_img_q->close();
 
-<a onclick="switchTab('profile-tab')"
-id="nav-profile">
-👤 My Profile
-</a>
+                                        if(empty($db_img)) {
+                                            $deal_img_q = $conn->prepare("SELECT image_url FROM deals WHERE id = ? LIMIT 1");
+                                            $deal_img_q->bind_param("i", $p_id_chk);
+                                            $deal_img_q->execute();
+                                            $res_di = $deal_img_q->get_result();
+                                            if($r_di = $res_di->fetch_assoc()) {
+                                                if(!empty($r_di['image_url'])) {
+                                                    $db_img = $r_di['image_url'];
+                                                    $is_deal = true;
+                                                }
+                                            }
+                                            $deal_img_q->close();
+                                        }
+                                    }
+                                }
 
-</nav>
+                                $resolved_img = 'image/default.jpg';
+                                if (!empty($db_img) && $db_img !== 'N/A') {
+                                    $clean_img = basename($db_img);
+                                    
+                                    if ($is_deal) {
+                                        if (file_exists('images/' . $clean_img)) {
+                                            $resolved_img = 'images/' . $clean_img;
+                                        } else {
+                                            $resolved_img = 'images/' . $clean_img;
+                                        }
+                                    } else {
+                                        if (file_exists('image/' . $clean_img)) {
+                                            $resolved_img = 'image/' . $clean_img;
+                                        } elseif (file_exists('images/' . $clean_img)) {
+                                            $resolved_img = 'images/' . $clean_img;
+                                        } else {
+                                            $resolved_img = 'image/' . $clean_img;
+                                        }
+                                    }
+                                }
+                        ?>
+                            <tr data-cart-id="<?php echo $cart['cart_id']; ?>" data-price="<?php echo $cart['product_price']; ?>">
+                                <td><img src="<?php echo htmlspecialchars($resolved_img); ?>" class="cart-img" alt="Product Image"></td>
+                                <td><?php echo htmlspecialchars($cart['product_name']); ?></td>
+                                <td>Rs. <?php echo number_format($cart['product_price'], 2); ?></td>
+                                <td>
+                                    <input type="number" min="1" value="<?php echo $cart['quantity']; ?>" class="qty-input" onchange="updateQuantity(this, <?php echo $cart['cart_id']; ?>, <?php echo $cart['product_price']; ?>)">
+                                </td>
+                                <td><strong>Rs. <span class="subtotal-text"><?php echo number_format($subtotal, 2); ?></span></strong></td>
+                            </tr>
+                        <?php endforeach; else: ?>
+                            <tr><td colspan="5" style="text-align:center;color:#77675c;padding:30px;">Your cart is empty right now.</td></tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
 
-<div class="user-pill">
+                <?php if ($grand_total > 0): ?>
+                    <div style="margin-top:25px; padding:22px; background:#fcfaf8; border:1px solid #e8ddd2; border-radius:10px; display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-family:Georgia,serif;font-size:18px;color:#3c2d25;text-transform:uppercase;letter-spacing:1px;">Total Investment:</span>
+                        <span style="font-size:22px;font-weight:700;color:#8c6239;">Rs. <span id="grandTotalText"><?php echo number_format($grand_total, 2); ?></span></span>
+                    </div>
 
-<img src="<?php echo htmlspecialchars($p_img); ?>"
-alt="User">
+                    <form action="customer.php" method="POST" onsubmit="return validateCreditCardForm()" style="margin-top:22px;">
+                        <div class="form-group">
+                            <label>Select Payment Method:</label>
+                            <div class="payment-box-toggle">
+                                <input type="radio" id="cod" name="payment_method" value="Cash on Delivery" checked onclick="toggleCardInputs(false)">
+                                <label for="cod" style="display:inline;font-weight:normal;text-transform:none;">Cash on Delivery</label>
+                            </div>
+                            <div class="payment-box-toggle">
+                                <input type="radio" id="cc" name="payment_method" value="Credit/Debit Card" onclick="toggleCardInputs(true)">
+                                <label for="cc" style="display:inline;font-weight:normal;text-transform:none;">Bank Credit / Debit Card</label>
+                                <div id="cardFields" style="display:none;margin-top:15px;">
+                                    <div class="form-group">
+                                        <label>Cardholder Name:</label>
+                                        <input type="text" id="cardName" placeholder="Name on Card">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Card Number:</label>
+                                        <input type="text" id="cardNumber" maxlength="16" placeholder="16 digit card number">
+                                        <div id="cardNumError" class="error-msg"></div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Expire Year:</label>
+                                        <input type="text" id="cardYear" maxlength="4" placeholder="2027">
+                                        <div id="cardYearError" class="error-msg"></div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>CVV:</label>
+                                        <input type="password" id="cardCvv" maxlength="3" placeholder="123">
+                                        <div id="cardCvvError" class="error-msg"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="submit" name="checkout_order" class="btn">Proceed to Secure Checkout</button>
+                    </form>
+                <?php endif; ?>
+            </div>
+        </div>
 
-<span>
-<?php echo htmlspecialchars($customer['name']); ?>
-</span>
+        <!-- ORDERS TAB -->
+        <div id="orders-tab" class="section-tab">
+            <div class="card-box">
+                <h2>Recent Orders & Delivery Status</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Products</th>
+                            <th>Total Amount</th>
+                            <th>Status</th>
+                            <th>Payment</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (count($orders_items) > 0): ?>
+                            <?php foreach ($orders_items as $ord): ?>
+                                <tr>
+                                    <td><strong>#GLW-<?php echo $ord['order_id']; ?></strong></td>
+                                    <td><?php echo htmlspecialchars($ord['products']); ?></td>
+                                    <td>Rs. <?php echo number_format($ord['total_amount'], 2); ?></td>
+                                    <td><strong style="color:#b88656;"><?php echo htmlspecialchars($ord['status']); ?></strong></td>
+                                    <td><?php echo htmlspecialchars($ord['payment_status']); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr><td colspan="5" style="text-align:center;color:#77675c;padding:25px;">No orders found in your history.</td></tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
+        <!-- COMPLAINTS TAB -->
+        <div id="complaints-tab" class="section-tab">
+            <div class="card-box">
+                <h2>Customer Support & Complaints</h2>
+                <?php if (!empty($complaint_error)): ?>
+                    <div class="error-msg" style="margin-bottom:15px;font-size:14px;"><?php echo htmlspecialchars($complaint_error); ?></div>
+                <?php endif; ?>
+
+                <form action="customer.php" method="POST">
+                    <div class="form-group">
+                        <label>Order ID:</label>
+                        <input type="number" name="order_id" placeholder="Enter your valid Order ID" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Complaint Message:</label>
+                        <textarea name="message" rows="4" placeholder="Describe your issue here..." required></textarea>
+                    </div>
+                    <button type="submit" name="submit_complaint" class="btn">Submit Complaint</button>
+                </form>
+
+                <h3 style="margin-top:35px;font-family:Georgia,serif;font-size:20px;color:#3c2d25;">Past Complaints & Admin Replies</h3>
+                <table style="margin-top:15px;">
+                    <thead>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Complaint</th>
+                            <th>Admin Reply</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (count($complaints_items) > 0): ?>
+                            <?php foreach ($complaints_items as $comp): ?>
+                                <tr>
+                                    <td>#GLW-<?php echo $comp['order_id']; ?></td>
+                                    <td><?php echo htmlspecialchars($comp['message']); ?></td>
+                                    <td>
+                                        <?php if (!empty($comp['admin_reply'])): ?>
+                                            <?php echo htmlspecialchars($comp['admin_reply']); ?>
+                                        <?php else: ?>
+                                            <span style="color:#77675c;">Pending Admin Reply...</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><?php echo htmlspecialchars($comp['status']); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr><td colspan="4" style="text-align:center;color:#77675c;padding:25px;">No complaints submitted yet.</td></tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- PROFILE TAB -->
+        <div id="profile-tab" class="section-tab">
+            <div class="card-box">
+                <h2>Customer Profile & Settings</h2>
+                <?php if (!empty($error_msg)): ?>
+                    <div class="error-msg" style="margin-bottom:15px;"><?php echo htmlspecialchars($error_msg); ?></div>
+                <?php endif; ?>
+
+                <form action="customer.php" method="POST" enctype="multipart/form-data">
+                    <div style="display:flex;align-items:center;gap:25px;margin-bottom:25px;">
+                        <img src="<?php echo htmlspecialchars($p_img); ?>" style="width:90px;height:90px;border-radius:50%;object-fit:cover;border:2px solid #b88656;background:#fcfaf8;" id="profilePreview" alt="Profile">
+                        <div>
+                            <input type="file" name="profile_image" accept="image/*" style="margin-bottom:8px;">
+                            <p style="color:#77675c;font-size:12px;">Choose a new luxury photo and click Save Changes.</p>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Full Name:</label>
+                        <input type="text" name="name" value="<?php echo htmlspecialchars($customer_name); ?>" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Delivery Address:</label>
+                        <textarea name="address" rows="3" required><?php echo htmlspecialchars($customer_address); ?></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Telephone Number:</label>
+                        <input type="text" name="phone" value="<?php echo htmlspecialchars($customer_phone); ?>" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email Address (Cannot be changed):</label>
+                        <input type="email" value="<?php echo htmlspecialchars($customer_email); ?>" disabled style="background:#eee;">
+                    </div>
+
+                    <div style="display:flex;gap:15px;margin-top:25px;">
+                        <button type="submit" name="update_details" class="btn">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
-
-</div>
-
-</div>
-
-
-<div class="container">
-
-<?php if (isset($_GET['success'])): ?>
-
-<div class="success-msg">
-🎉 Operation Successful! Changes saved successfully.
-</div>
-
-<?php endif; ?>
-
-
-<!-- DASHBOARD -->
-
-<div id="dashboard-tab"
-class="section-tab active-tab">
-
-<div class="welcome-card">
-
-<h2>
-✨ Welcome Back,
-<?php echo htmlspecialchars($customer['name']); ?>!
-</h2>
-
-<p>
-Manage your luxury skincare routine,
-track orders, and experience elegance at your fingertips.
-</p>
-
-</div>
-
-
-<div class="stats-grid">
-
-<div class="stat-card">
-
-<h3>📦 Total Orders Placed</h3>
-
-<p>
-<?php echo $total_orders; ?>
-</p>
-
-</div>
-
-
-<div class="stat-card">
-
-<h3>🚚 Pending Deliveries</h3>
-
-<p>
-<?php echo $pending_orders; ?>
-</p>
-
-</div>
-
-</div>
-
-
-<div class="card-box">
-
-<h2>📦 Recent Orders & Status</h2>
-
-<table>
-
-<thead>
-
-<tr>
-<th>Order ID</th>
-<th>Products</th>
-<th>Total Amount</th>
-<th>Status</th>
-</tr>
-
-</thead>
-
-<tbody>
-
-<?php if (count($orders_items) > 0): ?>
-
-<?php
-$count = 0;
-
-foreach ($orders_items as $ord):
-
-if ($count >= 3) break;
-
-$count++;
-?>
-
-<tr>
-
-<td>
-<strong>
-#GLW-<?php echo $ord['order_id']; ?>
-</strong>
-</td>
-
-<td>
-<?php echo htmlspecialchars($ord['products']); ?>
-</td>
-
-<td>
-Rs.
-<?php echo number_format($ord['total_amount'], 2); ?>
-</td>
-
-<td>
-
-<strong style="color:#e04a45;">
-
-⏳
-<?php echo htmlspecialchars($ord['status']); ?>
-
-</strong>
-
-</td>
-
-</tr>
-
-<?php endforeach; ?>
-
-<?php else: ?>
-
-<tr>
-
-<td colspan="4"
-style="text-align:center;color:#888;padding:20px;">
-
-No recent orders found.
-
-</td>
-
-</tr>
-
-<?php endif; ?>
-
-</tbody>
-
-</table>
-
-</div>
-
-</div>
-
-
-<!-- CART -->
-
-<div id="cart-tab"
-class="section-tab">
-
-<div class="card-box">
-
-<h2>🛍️ My Cart & Secure Checkout</h2>
-
-<table>
-
-<thead>
-
-<tr>
-
-<th>Image</th>
-<th>Product Name</th>
-<th>Price</th>
-<th>Quantity</th>
-<th>Total</th>
-
-</tr>
-
-</thead>
-
-<tbody>
-
-<?php
-
-$grand_total = 0;
-
-if (count($cart_items) > 0):
-
-foreach ($cart_items as $cart):
-
-$subtotal =
-$cart['product_price'] * $cart['quantity'];
-
-$grand_total += $subtotal;
-
-?>
-
-<tr
-data-cart-id="<?php echo $cart['cart_id']; ?>"
-data-price="<?php echo $cart['product_price']; ?>"
->
-
-<td>
-
-<img
-src="uploads/<?php echo htmlspecialchars($cart['product_image'] ?? 'default.jpg'); ?>"
-class="cart-img"
-alt="Product"
-onerror="this.src='<?php echo $default_avatar; ?>'"
->
-
-</td>
-
-<td>
-✨ <?php echo htmlspecialchars($cart['product_name']); ?>
-</td>
-
-<td>
-Rs.
-<?php echo number_format($cart['product_price'], 2); ?>
-</td>
-
-<td>
-
-<input
-type="number"
-min="1"
-value="<?php echo $cart['quantity']; ?>"
-class="qty-input"
-onchange="updateQuantity(
-this,
-<?php echo $cart['cart_id']; ?>,
-<?php echo $cart['product_price']; ?>
-)"
->
-
-</td>
-
-<td>
-
-<strong>
-
-Rs.
-
-<span class="subtotal-text">
-
-<?php echo number_format($subtotal, 2); ?>
-
-</span>
-
-</strong>
-
-</td>
-
-</tr>
-
-<?php endforeach; ?>
-
-<?php else: ?>
-
-<tr>
-
-<td colspan="5"
-style="text-align:center;color:#888;padding:20px;">
-
-🛒 Your cart is empty right now.
-
-</td>
-
-</tr>
-
-<?php endif; ?>
-
-</tbody>
-
-</table>
-
-
-<?php if ($grand_total > 0): ?>
-
-<h3 style="margin:20px 0 15px;color:#4b263a;">
-
-💎 Grand Total: Rs.
-
-<span id="grandTotalText">
-
-<?php echo number_format($grand_total, 2); ?>
-
-</span>
-
-</h3>
-
-
-<form
-action="customer.php"
-method="POST"
-onsubmit="return validateCreditCardForm()"
->
-
-<div class="form-group">
-
-<label>💳 Select Payment Method:</label>
-
-
-<div class="payment-box-toggle">
-
-<input
-type="radio"
-id="cod"
-name="payment_method"
-value="Cash on Delivery"
-checked
-onclick="toggleCardInputs(false)"
->
-
-<label for="cod"
-style="display:inline;font-weight:normal;">
-
-💵 Cash on Delivery
-
-</label>
-
-</div>
-
-
-<div class="payment-box-toggle">
-
-<input
-type="radio"
-id="cc"
-name="payment_method"
-value="Credit/Debit Card"
-onclick="toggleCardInputs(true)"
->
-
-<label for="cc"
-style="display:inline;font-weight:normal;">
-
-💳 Bank Credit / Debit Card
-
-</label>
-
-
-<div id="cardFields"
-style="display:none;margin-top:15px;">
-
-<div class="form-group">
-
-<label>Cardholder Name:</label>
-
-<input
-type="text"
-id="cardName"
-placeholder="Name on Card"
->
-
-</div>
-
-
-<div class="form-group">
-
-<label>Card Number:</label>
-
-<input
-type="text"
-id="cardNumber"
-maxlength="16"
-placeholder="16 digit card number"
->
-
-<div id="cardNumError"
-class="error-msg"></div>
-
-</div>
-
-
-<div class="form-group">
-
-<label>Expire Year:</label>
-
-<input
-type="text"
-id="cardYear"
-maxlength="4"
-placeholder="2027"
->
-
-<div id="cardYearError"
-class="error-msg"></div>
-
-</div>
-
-
-<div class="form-group">
-
-<label>CVV:</label>
-
-<input
-type="password"
-id="cardCvv"
-maxlength="3"
-placeholder="123"
->
-
-<div id="cardCvvError"
-class="error-msg"></div>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-
-<button
-type="submit"
-name="checkout_order"
-class="btn"
->
-
-🚀 Proceed to Secure Checkout
-
-</button>
-
-</form>
-
-<?php endif; ?>
-
-</div>
-
-</div>
-
-
-<!-- ORDERS -->
-
-<div id="orders-tab"
-class="section-tab">
-
-<div class="card-box">
-
-<h2>📦 Recent Orders & Delivery Status</h2>
-
-<table>
-
-<thead>
-
-<tr>
-
-<th>Order ID</th>
-<th>Products</th>
-<th>Total Amount</th>
-<th>Status</th>
-<th>Payment</th>
-
-</tr>
-
-</thead>
-
-<tbody>
-
-<?php if (count($orders_items) > 0): ?>
-
-<?php foreach ($orders_items as $ord): ?>
-
-<tr>
-
-<td>
-<strong>
-#GLW-<?php echo $ord['order_id']; ?>
-</strong>
-</td>
-
-<td>
-<?php echo htmlspecialchars($ord['products']); ?>
-</td>
-
-<td>
-Rs.
-<?php echo number_format($ord['total_amount'], 2); ?>
-</td>
-
-<td>
-
-<strong style="color:#e04a45;">
-
-⏳
-<?php echo htmlspecialchars($ord['status']); ?>
-
-</strong>
-
-</td>
-
-<td>
-
-<?php echo htmlspecialchars($ord['payment_status']); ?>
-
-</td>
-
-</tr>
-
-<?php endforeach; ?>
-
-<?php else: ?>
-
-<tr>
-
-<td colspan="5"
-style="text-align:center;color:#888;padding:20px;">
-
-📦 No orders found in your history.
-
-</td>
-
-</tr>
-
-<?php endif; ?>
-
-</tbody>
-
-</table>
-
-</div>
-
-</div>
-
-
-<!-- COMPLAINTS -->
-
-<div id="complaints-tab"
-class="section-tab">
-
-<div class="card-box">
-
-<h2>💬 Customer Support & Complaints</h2>
-
-
-<?php if (!empty($complaint_error)): ?>
-
-<div class="error-msg"
-style="margin-bottom:15px;font-size:14px;">
-
-<?php echo htmlspecialchars($complaint_error); ?>
-
-</div>
-
-<?php endif; ?>
-
-
-<form action="customer.php"
-method="POST">
-
-<div class="form-group">
-
-<label>🔢 Order ID:</label>
-
-<input
-type="number"
-name="order_id"
-placeholder="Enter your Order ID"
-required
->
-
-</div>
-
-
-<div class="form-group">
-
-<label>✍️ Complaint Message:</label>
-
-<textarea
-name="message"
-rows="4"
-placeholder="Describe your issue here..."
-required
-></textarea>
-
-</div>
-
-
-<button
-type="submit"
-name="submit_complaint"
-class="btn"
->
-
-📨 Submit Complaint
-
-</button>
-
-</form>
-
-
-<h3 style="margin-top:35px;">
-
-📋 Past Complaints & Admin Replies
-
-</h3>
-
-
-<table>
-
-<thead>
-
-<tr>
-
-<th>Order ID</th>
-<th>Complaint</th>
-<th>Admin Reply</th>
-<th>Status</th>
-
-</tr>
-
-</thead>
-
-<tbody>
-
-<?php if (count($complaints_items) > 0): ?>
-
-<?php foreach ($complaints_items as $comp): ?>
-
-<tr>
-
-<td>
-#GLW-<?php echo $comp['order_id']; ?>
-</td>
-
-<td>
-<?php echo htmlspecialchars($comp['message']); ?>
-</td>
-
-<td>
-
-<?php if (!empty($comp['admin_reply'])): ?>
-
-<?php echo htmlspecialchars($comp['admin_reply']); ?>
-
-<?php else: ?>
-
-<span style="color:#888;">
-
-⏳ Pending Admin Reply...
-
-</span>
-
-<?php endif; ?>
-
-</td>
-
-<td>
-
-<?php echo htmlspecialchars($comp['status']); ?>
-
-</td>
-
-</tr>
-
-<?php endforeach; ?>
-
-<?php else: ?>
-
-<tr>
-
-<td colspan="4"
-style="text-align:center;color:#888;padding:20px;">
-
-💬 No complaints submitted yet.
-
-</td>
-
-</tr>
-
-<?php endif; ?>
-
-</tbody>
-
-</table>
-
-</div>
-
-</div>
-
-
-<!-- PROFILE -->
-
-<div id="profile-tab"
-class="section-tab">
-
-<div class="card-box">
-
-<h2>👤 Customer Profile & Settings</h2>
-
-
-<form
-action="customer.php"
-method="POST"
-enctype="multipart/form-data"
->
-
-<div class="profile-container">
-
-<div class="profile-pic-wrapper">
-
-<img
-src="<?php echo htmlspecialchars($p_img); ?>"
-class="profile-pic"
-id="profilePreview"
-alt="Profile Picture"
->
-
-<input
-type="file"
-name="profile_image"
-id="imageInput"
-style="display:none;"
-accept="image/*"
-onchange="previewImage(event)"
->
-
-<button
-type="button"
-class="edit-icon-btn"
-onclick="document.getElementById('imageInput').click()"
->
-
-✏️
-
-</button>
-
-</div>
-
-
-<div>
-
-<h3>
-
-<?php echo htmlspecialchars($customer['name']); ?>
-
-</h3>
-
-<p>
-Click the pencil icon to upload a new profile photo.
-</p>
-
-</div>
-
-</div>
-
-
-<div class="form-group">
-
-<label>👤 Full Name:</label>
-
-<input
-type="text"
-name="name"
-id="profileName"
-value="<?php echo htmlspecialchars($customer['name']); ?>"
-readonly
-required
->
-
-</div>
-
-
-<div class="form-group">
-
-<label>🏠 Delivery Address:</label>
-
-<textarea
-name="address"
-id="profileAddress"
-readonly
-required
-><?php echo htmlspecialchars($customer['address']); ?></textarea>
-
-</div>
-
-
-<div class="form-group">
-
-<label>📞 Telephone Number:</label>
-
-<input
-type="text"
-name="phone"
-id="profilePhone"
-value="<?php echo htmlspecialchars($customer['phone']); ?>"
-readonly
-required
->
-
-</div>
-
-
-<div class="form-group">
-
-<label>✉️ Email Address:</label>
-
-<input
-type="email"
-value="<?php echo htmlspecialchars($customer['email']); ?>"
-disabled
->
-
-</div>
-
-
-<div style="display:flex;gap:15px;justify-content:space-between;">
-
-<div>
-
-<button
-type="button"
-class="btn"
-id="editProfileBtn"
-onclick="enableProfileEdit()"
->
-
-✏️ Edit Profile
-
-</button>
-
-
-<button
-type="submit"
-name="update_details"
-class="btn"
-id="saveProfileBtn"
-style="display:none;"
->
-
-💾 Save Changes
-
-</button>
-
-</div>
-
-
-<button
-type="button"
-onclick="confirmLogout()"
-class="logout-btn-profile"
->
-
-🚪 Logout
-
-</button>
-
-</div>
-
-</form>
-
-</div>
-
-</div>
-
-</div>
-
 
 <script>
-
 function switchTab(tabId) {
-
-    document.querySelectorAll('.section-tab')
-        .forEach(function(tab) {
-            tab.classList.remove('active-tab');
-        });
-
-    document.querySelectorAll('.sub-navbar nav a')
-        .forEach(function(nav) {
-            nav.classList.remove('active');
-        });
-
-    const selectedTab =
-        document.getElementById(tabId);
-
-    if (selectedTab) {
-        selectedTab.classList.add('active-tab');
-    }
-
+    document.querySelectorAll('.section-tab').forEach(tab => tab.classList.remove('active-tab'));
+    document.querySelectorAll('.sidebar-nav a').forEach(nav => nav.classList.remove('active'));
+    
+    const selectedTab = document.getElementById(tabId);
+    if (selectedTab) selectedTab.classList.add('active-tab');
+    
     const navMap = {
         'dashboard-tab': 'nav-dashboard',
         'cart-tab': 'nav-cart',
@@ -1693,280 +899,81 @@ function switchTab(tabId) {
         'complaints-tab': 'nav-complaints',
         'profile-tab': 'nav-profile'
     };
-
     if (navMap[tabId]) {
-
-        document
-            .getElementById(navMap[tabId])
-            .classList.add('active');
+        document.getElementById(navMap[tabId]).classList.add('active');
     }
 }
 
-
-function confirmLogout() {
-
-    if (confirm("Are you sure you want to log out?")) {
-
-        window.location.href =
-            "customer_logout.php";
+window.addEventListener('DOMContentLoaded', () => {
+    if (window.location.hash === '#cart' || window.location.search.includes('tab=cart')) {
+        switchTab('cart-tab');
     }
-}
+});
 
-
-function updateQuantity(
-    inputElement,
-    cartId,
-    price
-) {
-
-    let qty =
-        parseInt(inputElement.value);
-
-    if (qty <= 0 || isNaN(qty)) {
-
-        qty = 1;
-
-        inputElement.value = 1;
-    }
-
-    const row =
-        inputElement.closest('tr');
-
-    const subtotal =
-        qty * price;
-
-    row.querySelector('.subtotal-text')
-        .textContent =
-        subtotal.toLocaleString(
-            'en-US',
-            {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            }
-        );
-
-
+function updateQuantity(inputElement, cartId, price) {
+    let qty = parseInt(inputElement.value);
+    if (qty <= 0 || isNaN(qty)) { qty = 1; inputElement.value = 1; }
+    
+    const row = inputElement.closest('tr');
+    const subtotal = qty * price;
+    row.querySelector('.subtotal-text').textContent = subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    
     let grandTotal = 0;
-
-    document
-        .querySelectorAll('tr[data-cart-id]')
-        .forEach(function(tr) {
-
-            const p =
-                parseFloat(
-                    tr.getAttribute('data-price')
-                );
-
-            const q =
-                parseInt(
-                    tr.querySelector('.qty-input').value
-                ) || 0;
-
-            grandTotal += p * q;
-        });
-
-
-    const grandTotalText =
-        document.getElementById('grandTotalText');
-
+    document.querySelectorAll('tr[data-cart-id]').forEach(tr => {
+        const p = parseFloat(tr.getAttribute('data-price'));
+        const q = parseInt(tr.querySelector('.qty-input').value) || 0;
+        grandTotal += p * q;
+    });
+    
+    const grandTotalText = document.getElementById('grandTotalText');
     if (grandTotalText) {
-
-        grandTotalText.textContent =
-            grandTotal.toLocaleString(
-                'en-US',
-                {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                }
-            );
+        grandTotalText.textContent = grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
-
-    const formData =
-        new URLSearchParams();
-
-    formData.append(
-        'update_cart_qty',
-        '1'
-    );
-
-    formData.append(
-        'cart_id',
-        cartId
-    );
-
-    formData.append(
-        'quantity',
-        qty
-    );
-
-
+    const formData = new URLSearchParams();
+    formData.append('update_cart_qty', '1');
+    formData.append('cart_id', cartId);
+    formData.append('quantity', qty);
+    
     fetch('customer.php', {
-
         method: 'POST',
-
-        headers: {
-            'Content-Type':
-                'application/x-www-form-urlencoded'
-        },
-
-        body:
-            formData.toString()
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData.toString()
     });
 }
 
-
-function enableProfileEdit() {
-
-    document
-        .getElementById('profileName')
-        .removeAttribute('readonly');
-
-    document
-        .getElementById('profileAddress')
-        .removeAttribute('readonly');
-
-    document
-        .getElementById('profilePhone')
-        .removeAttribute('readonly');
-
-
-    document
-        .getElementById('editProfileBtn')
-        .style.display = 'none';
-
-    document
-        .getElementById('saveProfileBtn')
-        .style.display = 'inline-block';
-}
-
-
-function previewImage(event) {
-
-    const file =
-        event.target.files[0];
-
-    if (!file) return;
-
-    const reader =
-        new FileReader();
-
-    reader.onload = function() {
-
-        document
-            .getElementById('profilePreview')
-            .src = reader.result;
-    };
-
-    reader.readAsDataURL(file);
-}
-
-
 function toggleCardInputs(show) {
-
-    document
-        .getElementById('cardFields')
-        .style.display =
-        show ? 'block' : 'none';
+    document.getElementById('cardFields').style.display = show ? 'block' : 'none';
 }
-
 
 function validateCreditCardForm() {
-
-    const isCardSelected =
-        document
-            .getElementById('cc')
-            .checked;
-
-    if (!isCardSelected) {
-        return true;
-    }
-
-
+    if (!document.getElementById('cc').checked) return true;
     let isValid = true;
+    document.getElementById('cardNumError').textContent = '',
+    document.getElementById('cardYearError').textContent = '',
+    document.getElementById('cardCvvError').textContent = '';
 
-
-    document
-        .getElementById('cardNumError')
-        .textContent = '';
-
-    document
-        .getElementById('cardYearError')
-        .textContent = '';
-
-    document
-        .getElementById('cardCvvError')
-        .textContent = '';
-
-
-    const cardNumber =
-        document
-            .getElementById('cardNumber')
-            .value
-            .trim();
-
-
+    const cardNumber = document.getElementById('cardNumber').value.trim();
     if (!/^\d{16}$/.test(cardNumber)) {
-
-        document
-            .getElementById('cardNumError')
-            .textContent =
-            '⚠️ Card Number must be exactly 16 digits.';
-
+        document.getElementById('cardNumError').textContent = 'Card Number must be exactly 16 digits.';
         isValid = false;
     }
 
-
-    const currentYear =
-        new Date().getFullYear();
-
-    const cardYear =
-        parseInt(
-            document
-                .getElementById('cardYear')
-                .value
-                .trim(),
-            10
-        );
-
-
-    if (
-        isNaN(cardYear) ||
-        cardYear < currentYear
-    ) {
-
-        document
-            .getElementById('cardYearError')
-            .textContent =
-            '⚠️ Enter a valid expiry year.';
-
+    const currentYear = new Date().getFullYear();
+    const cardYear = parseInt(document.getElementById('cardYear').value.trim(), 10);
+    if (isNaN(cardYear) || cardYear < currentYear) {
+        document.getElementById('cardYearError').textContent = 'Enter a valid expiry year.';
         isValid = false;
     }
 
-
-    const cardCvv =
-        document
-            .getElementById('cardCvv')
-            .value
-            .trim();
-
-
+    const cardCvv = document.getElementById('cardCvv').value.trim();
     if (!/^\d{3}$/.test(cardCvv)) {
-
-        document
-            .getElementById('cardCvvError')
-            .textContent =
-            '⚠️ CVV must be exactly 3 digits.';
-
+        document.getElementById('cardCvvError').textContent = 'CVV must be exactly 3 digits.';
         isValid = false;
     }
-
-
     return isValid;
 }
-
 </script>
 
 </body>
-
 </html>
