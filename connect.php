@@ -2,7 +2,7 @@
 // Database Configuration
 $host     = "127.0.0.1";
 $db_name  = "glowcare_db";
-$port = "3306";
+$port = "3308";
 $username = "root";
 $password = "";
 
