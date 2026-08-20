@@ -5,6 +5,12 @@ require_once 'connect.php';
 $login_error = "";
 $register_error = "";
 
+// Form input වල පැරණි අගයන් රඳවා ගැනීමට variables
+$reg_name = "";
+$reg_address = "";
+$reg_phone = "";
+$reg_email = "";
+
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['login'])) {
     $email = trim($_POST['login_email']);
     $password = $_POST['login_password'];
@@ -55,20 +61,22 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['login'])) {
 }
 
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
-    $name = trim($_POST['reg_name']);
-    $address = trim($_POST['reg_address']);
-    $phone = trim($_POST['reg_phone']);
-    $email = trim($_POST['reg_email']);
+    $reg_name = trim($_POST['reg_name']);
+    $reg_address = trim($_POST['reg_address']);
+    $reg_phone = trim($_POST['reg_phone']);
+    $reg_email = trim($_POST['reg_email']);
     $password = $_POST['reg_password'];
 
-    if (empty($name) || empty($address) || empty($phone) || empty($email) || empty($password)) {
+    if (empty($reg_name) || empty($reg_address) || empty($reg_phone) || empty($reg_email) || empty($password)) {
         $register_error = "Please fill in all fields.";
-    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    } elseif (!filter_var($reg_email, FILTER_VALIDATE_EMAIL)) {
         $register_error = "Please enter a valid email address.";
+    } elseif (!preg_match('/^[0-9]{10}$/', $reg_phone)) {
+        $register_error = "Invalid phone number! Please enter a valid 10-digit phone number.";
     } else {
         $check_stmt = $conn->prepare("SELECT id FROM customers WHERE email = ? LIMIT 1");
         if ($check_stmt) {
-            $check_stmt->bind_param("s", $email);
+            $check_stmt->bind_param("s", $reg_email);
             $check_stmt->execute();
             $check_result = $check_stmt->get_result();
 
@@ -78,11 +86,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
                 $hashed_password = password_hash($password, PASSWORD_DEFAULT);
                 $insert_stmt = $conn->prepare("INSERT INTO customers (name, address, phone, email, password) VALUES (?, ?, ?, ?, ?)");
                 if ($insert_stmt) {
-                    $insert_stmt->bind_param("sssss", $name, $address, $phone, $email, $hashed_password);
+                    $insert_stmt->bind_param("sssss", $reg_name, $reg_address, $reg_phone, $reg_email, $hashed_password);
                     if ($insert_stmt->execute()) {
                         session_regenerate_id(true);
                         $_SESSION['customer_id'] = $insert_stmt->insert_id;
-                        $_SESSION['customer_name'] = $name;
+                        $_SESSION['customer_name'] = $reg_name;
                         $insert_stmt->close();
                         header("Location: customer.php");
                         exit();
@@ -328,11 +336,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
                 <form method="POST" action="login.php">
                     <div class="form-group">
                         <label>Email Address:</label>
-                        <input type="email" name="login_email"  placeholder="Enter your email" autocomplete= "off"  required>
+                        <input type="email" name="login_email" placeholder="Enter your email" autocomplete="off" required>
                     </div>
                     <div class="form-group" style="margin-bottom: 22px;">
                         <label>Password:</label>
-                        <input type="password" name="login_password" placeholder="Enter your password" autocomplete= "new-password"required>
+                        <input type="password" name="login_password" placeholder="Enter your password" autocomplete="new-password" required>
                     </div>
                     <button type="submit" name="login" class="btn">Login</button>
                 </form>
@@ -347,19 +355,20 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
                 <form method="POST" action="login.php">
                     <div class="form-group">
                         <label>Full Name:</label>
-                        <input type="text" name="reg_name" placeholder="Enter your full name" required>
+                        <input type="text" name="reg_name" placeholder="Enter your full name" value="<?php echo htmlspecialchars($reg_name); ?>" required>
                     </div>
                     <div class="form-group">
                         <label>Address:</label>
-                        <textarea name="reg_address" placeholder="Enter your address" required style="height: 60px; resize: vertical;"></textarea>
+                        <textarea name="reg_address" placeholder="Enter your address" required style="height: 60px; resize: vertical;"><?php echo htmlspecialchars($reg_address); ?></textarea>
                     </div>
                     <div class="form-group">
                         <label>Phone Number:</label>
-                        <input type="tel" name="reg_phone" placeholder="Enter your phone number" required>
+                        <!-- 10 digits validation (value එක නැවත පෙන්වීමට value attribute එක එකතු කර ඇත) -->
+                        <input type="tel" name="reg_phone" placeholder="0771234567" value="<?php echo htmlspecialchars($reg_phone); ?>" pattern="[0-9]{10}" maxlength="10" title="Please enter exactly 10 digits" required>
                     </div>
                     <div class="form-group">
                         <label>Email Address:</label>
-                        <input type="email" name="reg_email" placeholder="Enter your email address" required>
+                        <input type="email" name="reg_email" placeholder="Enter your email address" value="<?php echo htmlspecialchars($reg_email); ?>" required>
                     </div>
                     <div class="form-group" style="margin-bottom: 22px;">
                         <label>Create Password:</label>
