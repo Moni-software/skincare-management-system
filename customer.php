@@ -57,22 +57,30 @@ if (isset($_POST['update_details'])) {
     }
 }
 
-/*UPDATE CART QUANTITY (AJAX)*/
+/*UPDATE CART QUANTITY / DELETE ITEM (AJAX)*/
 
-if (isset($_POST['update_cart_qty'])) {
-    $cart_id = intval($_POST['cart_id']);
-    $new_qty = intval($_POST['quantity']);
+if (isset($_POST['action_type'])) {
+    $cart_id = intval($_POST['cart_id'] ?? 0);
+    $action_type = $_POST['action_type'];
 
-    if ($new_qty > 0) {
-        $up_cart = $conn->prepare("UPDATE cart SET quantity = ? WHERE cart_id = ? AND customer_id = ?");
-        $up_cart->bind_param("iii", $new_qty, $cart_id, $customer_id);
-        $up_cart->execute();
-        $up_cart->close();
-    } else {
+    if ($action_type === 'delete' && $cart_id > 0) {
         $del_cart = $conn->prepare("DELETE FROM cart WHERE cart_id = ? AND customer_id = ?");
         $del_cart->bind_param("ii", $cart_id, $customer_id);
         $del_cart->execute();
         $del_cart->close();
+    } elseif ($action_type === 'update' && $cart_id > 0) {
+        $new_qty = intval($_POST['quantity'] ?? 1);
+        if ($new_qty > 0) {
+            $up_cart = $conn->prepare("UPDATE cart SET quantity = ? WHERE cart_id = ? AND customer_id = ?");
+            $up_cart->bind_param("iii", $new_qty, $cart_id, $customer_id);
+            $up_cart->execute();
+            $up_cart->close();
+        } else {
+            $del_cart = $conn->prepare("DELETE FROM cart WHERE cart_id = ? AND customer_id = ?");
+            $del_cart->bind_param("ii", $cart_id, $customer_id);
+            $del_cart->execute();
+            $del_cart->close();
+        }
     }
     exit();
 }
@@ -439,6 +447,22 @@ $complaints_stmt->close();
         border-radius: 6px;
         font-size: 14px;
     }
+
+    .btn-delete-cart {
+        background: #b33939;
+        color: #fff;
+        border: none;
+        padding: 7px 12px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+        transition: 0.3s;
+    }
+
+    .btn-delete-cart:hover {
+        background: #822525;
+    }
     
     .form-group {
         margin-bottom: 22px;
@@ -627,6 +651,7 @@ $complaints_stmt->close();
                             <th>Price</th>
                             <th>Quantity</th>
                             <th>Total</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -702,14 +727,17 @@ $complaints_stmt->close();
                                     <input type="number" min="1" value="<?php echo $cart['quantity']; ?>" class="qty-input" onchange="updateQuantity(this, <?php echo $cart['cart_id']; ?>, <?php echo $cart['product_price']; ?>)">
                                 </td>
                                 <td><strong>Rs. <span class="subtotal-text"><?php echo number_format($subtotal, 2); ?></span></strong></td>
+                                <td>
+                                    <button type="button" class="btn-delete-cart" onclick="deleteCartItem(<?php echo $cart['cart_id']; ?>)">Remove</button>
+                                </td>
                             </tr>
                         <?php endforeach; else: ?>
-                            <tr><td colspan="5" style="text-align:center;color:#77675c;padding:30px;">Your cart is empty right now.</td></tr>
+                            <tr><td colspan="6" style="text-align:center;color:#77675c;padding:30px;">Your cart is empty right now.</td></tr>
                         <?php endif; ?>
                     </tbody>
                 </table>
 
-                <?php if ($grand_total > 0): ?>
+                <div id="checkoutSectionWrapper" style="<?php echo ($grand_total <= 0) ? 'display:none;' : ''; ?>">
                     <div style="margin-top:25px; padding:22px; background:#fcfaf8; border:1px solid #e8ddd2; border-radius:10px; display:flex; justify-content:space-between; align-items:center;">
                         <span style="font-family:Georgia,serif;font-size:18px;color:#3c2d25;text-transform:uppercase;letter-spacing:1px;">Total Investment:</span>
                         <span style="font-size:22px;font-weight:700;color:#8c6239;">Rs. <span id="grandTotalText"><?php echo number_format($grand_total, 2); ?></span></span>
@@ -750,7 +778,7 @@ $complaints_stmt->close();
                         </div>
                         <button type="submit" name="checkout_order" class="btn">Proceed to Secure Checkout</button>
                     </form>
-                <?php endif; ?>
+                </div>
             </div>
         </div>
 
@@ -918,6 +946,58 @@ function updateQuantity(inputElement, cartId, price) {
     const subtotal = qty * price;
     row.querySelector('.subtotal-text').textContent = subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     
+    recalculateGrandTotal();
+
+    const formData = new URLSearchParams();
+    formData.append('action_type', 'update');
+    formData.append('cart_id', cartId);
+    formData.append('quantity', qty);
+    
+    fetch('customer.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData.toString()
+    });
+}
+
+function deleteCartItem(cartId) {
+    const row = document.querySelector(`tr[data-cart-id="${cartId}"]`);
+    if (row) {
+        row.remove();
+    }
+    
+    recalculateGrandTotal();
+
+    const remainingRows = document.querySelectorAll('tr[data-cart-id]');
+    if (remainingRows.length === 0) {
+        const tbody = document.querySelector('#cart-tab tbody');
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#77675c;padding:30px;">Your cart is empty right now.</td></tr>';
+        }
+        const checkoutWrapper = document.getElementById('checkoutSectionWrapper');
+        if (checkoutWrapper) {
+            checkoutWrapper.style.display = 'none';
+        }
+    }
+
+    const formData = new URLSearchParams();
+    formData.append('action_type', 'delete');
+    formData.append('cart_id', cartId);
+    
+    fetch('customer.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData.toString()
+    }).then(() => {
+        const badge = document.getElementById('sidebarCartBadge');
+        if (badge) {
+            let currentCount = parseInt(badge.textContent) || 1;
+            badge.textContent = Math.max(0, currentCount - 1);
+        }
+    });
+}
+
+function recalculateGrandTotal() {
     let grandTotal = 0;
     document.querySelectorAll('tr[data-cart-id]').forEach(tr => {
         const p = parseFloat(tr.getAttribute('data-price'));
@@ -930,16 +1010,14 @@ function updateQuantity(inputElement, cartId, price) {
         grandTotalText.textContent = grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
-    const formData = new URLSearchParams();
-    formData.append('update_cart_qty', '1');
-    formData.append('cart_id', cartId);
-    formData.append('quantity', qty);
-    
-    fetch('customer.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: formData.toString()
-    });
+    const checkoutWrapper = document.getElementById('checkoutSectionWrapper');
+    if (checkoutWrapper) {
+        if (grandTotal > 0) {
+            checkoutWrapper.style.display = 'block';
+        } else {
+            checkoutWrapper.style.display = 'none';
+        }
+    }
 }
 
 function toggleCardInputs(show) {
