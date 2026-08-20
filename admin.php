@@ -1,6 +1,4 @@
 <?php
-// Start the session before any HTML/output is sent.
-// This keeps the shared navbar compatible without editing navbar.php.
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }

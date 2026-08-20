@@ -2,8 +2,6 @@
 session_start();
 require_once "connect.php";
 
-/* Integrated login + logout for admin_dashboard.php */
-
 if (isset($_GET['logout'])) {
     session_unset();
     session_destroy();
@@ -227,7 +225,7 @@ $customersExist = !empty($customerCols);
 if (empty($_SESSION['admin_csrf'])) $_SESSION['admin_csrf'] = bin2hex(random_bytes(24));
 $csrf = $_SESSION['admin_csrf'];
 
-// ---------------- EXPORTS ----------------
+//  EXPORTS 
 if (isset($_GET['export']) && in_array($_GET['export'], ['sales_csv','sales_pdf'], true)) {
     $period = $_GET['period'] ?? 'monthly';
     $dateExpr = "DATE(order_date)";
@@ -251,7 +249,7 @@ if (isset($_GET['export']) && in_array($_GET['export'], ['sales_csv','sales_pdf'
     simple_pdf_download('glowcare_sales_'.$period.'.pdf','Glow Care Sales Report - '.ucfirst($period),$lines);
 }
 
-// ---------------- POST ACTIONS ----------------
+//  POST ACTIONS 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!hash_equals($csrf, $_POST['csrf'] ?? '')) die('Invalid request token. Please refresh and try again.');
     $action = $_POST['action'] ?? '';

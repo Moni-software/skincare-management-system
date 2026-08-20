@@ -31,14 +31,6 @@ if (
 
 mysqli_report(MYSQLI_REPORT_OFF);
 
-/*
-|--------------------------------------------------------------------------
-| Make the existing complaints table support PUBLIC complaints
-|--------------------------------------------------------------------------
-| The existing customer-dashboard complaint system uses customer_id/order_id.
-| IT Support complaints can come from users who are not logged in, so the
-| public contact details are stored directly on the complaint record.
-*/
 $alterQueries = [
     "ALTER TABLE complaints ADD COLUMN IF NOT EXISTS customer_name_text VARCHAR(150) NULL",
     "ALTER TABLE complaints ADD COLUMN IF NOT EXISTS customer_email VARCHAR(190) NULL",
@@ -51,14 +43,10 @@ foreach ($alterQueries as $sql) {
     $conn->query($sql);
 }
 
-// Public complaints must be allowed to have no registered customer or order.
-// These statements are safe for the common INT schema used in this project.
-// If the columns are already nullable, MySQL simply keeps them nullable.
 $conn->query("ALTER TABLE complaints MODIFY customer_id INT NULL");
 $conn->query("ALTER TABLE complaints MODIFY order_id INT NULL");
 
-// If an order ID was supplied, only keep it when it is a valid numeric ID.
-// Otherwise NULL means "Public Complaint" in the admin dashboard.
+
 $order_id = null;
 if ($order_id_raw !== "" && ctype_digit($order_id_raw)) {
     $candidate = (int)$order_id_raw;
@@ -75,9 +63,6 @@ if ($order_id_raw !== "" && ctype_digit($order_id_raw)) {
     }
 }
 
-// This form is a PUBLIC support form, so customer_id remains NULL.
-// If a valid Order ID was entered, the admin dashboard can classify it
-// as an order complaint. With no Order ID it appears under Public Complaints.
 $customer_id = null;
 $status = "Pending";
 
